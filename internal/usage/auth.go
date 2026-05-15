@@ -25,7 +25,7 @@ const (
 	usageAuthBlockDuration = 5 * time.Minute
 	usageAuthEntryTTL      = 15 * time.Minute
 	usageSessionTTL        = 12 * time.Hour
-	usageSessionCookieName = "askplanner_usage_session"
+	usageSessionCookieName = "askbr_usage_session"
 )
 
 type usageAccessControl struct {
@@ -62,7 +62,7 @@ func newUsageAccessControl(cfg *config.Config) (*usageAccessControl, error) {
 
 	realm := strings.TrimSpace(cfg.UsageAuthRealm)
 	if realm == "" {
-		realm = "askplanner dashboard - contact guojiangtao for access"
+		realm = "Ask BR dashboard - contact guojiangtao for access"
 	}
 
 	control := &usageAccessControl{
@@ -231,7 +231,7 @@ func writeAuthRateLimited(w http.ResponseWriter) {
 	w.Header().Set("Retry-After", "300")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.WriteHeader(http.StatusTooManyRequests)
-	_, _ = w.Write([]byte(renderUsageAuthPage("Too Many Attempts", "askplanner dashboard", "Too many login attempts were detected. Wait a few minutes before trying again.", "", true)))
+	_, _ = w.Write([]byte(renderUsageAuthPage("Too Many Attempts", "Ask BR dashboard", "Too many login attempts were detected. Wait a few minutes before trying again.", "", true)))
 }
 
 func writeLoginPage(w http.ResponseWriter, statusCode int, realm, nextPath, errorMessage string) {
@@ -353,7 +353,7 @@ func renderUsageAuthPage(title, realm, errorMessage, nextPath string, locked boo
 </head>
 <body>
   <main>
-    <p class="kicker">askplanner dashboard</p>
+    <p class="kicker">Ask BR dashboard</p>
     <h1>{{.Title}}</h1>
     <p>{{.Realm}}</p>
     {{if .ErrorMessage}}<div class="alert">{{.ErrorMessage}}</div>{{end}}

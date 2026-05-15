@@ -43,7 +43,7 @@ func BuildInitialPrompt(normalizedPrompt, summary, question string, runtime Runt
 	var sb strings.Builder
 	sb.WriteString(strings.TrimSpace(normalizedPrompt))
 	sb.WriteString("\n\n## Runtime Context\n")
-	sb.WriteString("- You are serving a TiDB query tuning chat relay backed by Codex CLI.\n")
+	sb.WriteString("- You are serving Ask BR, a TiDB backup/restore chat relay backed by Codex CLI.\n")
 	sb.WriteString("- Answer the user's latest message directly.\n")
 	writeWorkspaceContext(&sb, runtime.Workspace)
 	writeThreadContext(&sb, runtime.Thread)
@@ -63,7 +63,7 @@ func BuildInitialPrompt(normalizedPrompt, summary, question string, runtime Runt
 
 func BuildResumePrompt(question string, runtime RuntimeContext) string {
 	var sb strings.Builder
-	sb.WriteString("Continue the existing TiDB query tuning conversation.\n")
+	sb.WriteString("Continue the existing TiDB backup/restore conversation.\n")
 	writeWorkspaceContext(&sb, runtime.Workspace)
 	writeAttachmentContext(&sb, runtime.Attachment)
 	writeClinicLibraryContext(&sb, runtime.ClinicLibrary)

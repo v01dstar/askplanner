@@ -59,22 +59,20 @@ type workspaceMetadata struct {
 }
 
 type Manager struct {
-	rootDir                string
-	usersDir               string
-	mirrorsDir             string
-	locksDir               string
-	trashDir               string
-	uploadRoot             string
-	clinicRoot             string
-	idleTTL                time.Duration
-	gcInterval             time.Duration
-	agentRulesSyncInterval time.Duration
-	repos                  map[string]RepoSpec
-	repoOrder              []string
+	rootDir    string
+	usersDir   string
+	mirrorsDir string
+	locksDir   string
+	trashDir   string
+	uploadRoot string
+	clinicRoot string
+	idleTTL    time.Duration
+	gcInterval time.Duration
+	repos      map[string]RepoSpec
+	repoOrder  []string
 
-	mu                 sync.Mutex
-	lastGCAttempt      time.Time
-	lastAgentRulesSync time.Time
+	mu            sync.Mutex
+	lastGCAttempt time.Time
 }
 
 func NewManager(cfg *config.Config) (*Manager, error) {
@@ -84,16 +82,15 @@ func NewManager(cfg *config.Config) (*Manager, error) {
 	}
 
 	m := &Manager{
-		rootDir:                rootDir,
-		usersDir:               filepath.Join(rootDir, "users"),
-		mirrorsDir:             filepath.Join(rootDir, "mirrors"),
-		locksDir:               filepath.Join(rootDir, "locks"),
-		trashDir:               filepath.Join(rootDir, ".trash"),
-		uploadRoot:             cfg.FeishuFileDir,
-		clinicRoot:             cfg.ClinicStoreDir,
-		idleTTL:                time.Duration(cfg.WorkspaceIdleTTLHours) * time.Hour,
-		gcInterval:             time.Duration(cfg.WorkspaceGCIntervalMin) * time.Minute,
-		agentRulesSyncInterval: time.Duration(cfg.AgentRulesSyncIntervalMin) * time.Minute,
+		rootDir:    rootDir,
+		usersDir:   filepath.Join(rootDir, "users"),
+		mirrorsDir: filepath.Join(rootDir, "mirrors"),
+		locksDir:   filepath.Join(rootDir, "locks"),
+		trashDir:   filepath.Join(rootDir, ".trash"),
+		uploadRoot: cfg.FeishuFileDir,
+		clinicRoot: cfg.ClinicStoreDir,
+		idleTTL:    time.Duration(cfg.WorkspaceIdleTTLHours) * time.Hour,
+		gcInterval: time.Duration(cfg.WorkspaceGCIntervalMin) * time.Minute,
 		repos: map[string]RepoSpec{
 			"tidb": {
 				Name:          "tidb",
@@ -108,7 +105,6 @@ func NewManager(cfg *config.Config) (*Manager, error) {
 				LocalRepoPath: filepath.Join(cfg.ProjectRoot, "contrib", "agent-rules"),
 				RemoteURL:     strings.TrimSpace(cfg.WorkspaceRepoAgentRulesURL),
 				DefaultRef:    strings.TrimSpace(cfg.WorkspaceRepoAgentRulesDefaultRef),
-				TrackLatest:   true,
 			},
 			"tidb-docs": {
 				Name:          "tidb-docs",
@@ -145,9 +141,6 @@ func (m *Manager) Ensure(ctx context.Context, userKey string) (*Workspace, error
 	defer func() {
 		log.Printf("[workspace] ensure done user=%s elapsed=%s", sanitizePathSegment(userKey, ""), time.Since(start))
 	}()
-	if err := m.syncAgentRulesMirrorIfDue(ctx); err != nil {
-		log.Printf("[workspace] scheduled agent-rules sync failed: %v", err)
-	}
 	lock, userKey, err := m.lockUser(userKey, false)
 	if err != nil {
 		return nil, err
@@ -448,22 +441,6 @@ func (m *Manager) ResetUser(ctx context.Context, userKey string) (string, error)
 }
 
 func (m *Manager) StartBackgroundJobs(ctx context.Context) {
-	if m.agentRulesSyncInterval > 0 {
-		go func() {
-			ticker := time.NewTicker(m.agentRulesSyncInterval)
-			defer ticker.Stop()
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				case <-ticker.C:
-					if err := m.syncAgentRulesMirror(ctx); err != nil {
-						log.Printf("[workspace] background agent-rules sync failed: %v", err)
-					}
-				}
-			}
-		}()
-	}
 	if m.gcInterval > 0 {
 		go func() {
 			ticker := time.NewTicker(m.gcInterval)
@@ -757,21 +734,6 @@ func (m *Manager) removeWorkspaceLocked(ctx context.Context, userKey string) err
 		}
 	}
 	return nil
-}
-
-func (m *Manager) syncAgentRulesMirrorIfDue(ctx context.Context) error {
-	if m.agentRulesSyncInterval <= 0 {
-		return nil
-	}
-	m.mu.Lock()
-	if time.Since(m.lastAgentRulesSync) < m.agentRulesSyncInterval {
-		m.mu.Unlock()
-		return nil
-	}
-	m.lastAgentRulesSync = time.Now()
-	m.mu.Unlock()
-	log.Printf("[workspace] scheduled agent-rules sync triggered")
-	return m.syncAgentRulesMirror(ctx)
 }
 
 func (m *Manager) syncAgentRulesMirror(ctx context.Context) error {

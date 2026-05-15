@@ -1,6 +1,8 @@
-# askplanner_v2
+# Ask BR
 
-Go relay for **TiDB SQL query tuning**. Receives questions (CLI or Lark bot) → forwards to [Codex CLI](https://github.com/openai/codex) → returns answer. This project handles session management, prompt loading, and I/O; all reasoning happens inside Codex CLI.
+Go relay for **TiDB backup/restore diagnosis**. Receives BR, PITR, log backup, restore, and TiDB Lightning questions (CLI or Lark bot) → forwards to [Codex CLI](https://github.com/openai/codex) → returns answer. This project handles session management, prompt loading, workspace setup, and I/O; all reasoning happens inside Codex CLI.
+
+The historical Go module, binary names, and default runtime state directory still use `askplanner` / `.askplanner` for compatibility. User-facing product language should say **Ask BR** unless referring to an actual path, binary, environment variable, package, or migration tool.
 
 ## Architecture
 
@@ -26,7 +28,7 @@ cmd/askplanner_migrate_userdata ─┤
 
 | File | Role |
 |---|---|
-| `prompt` | 18KB system prompt: TiDB tuning persona, tool adaptation rules, skill refs |
+| `prompt` | Ask BR system prompt: TiDB backup/restore persona, tool adaptation rules, skill refs |
 | `internal/config/config.go` | Env-var config loading, `SetupLogging()` |
 | `internal/codex/responder.go` | Orchestration: resume vs new session, calls runner. Entry: `NewResponder(cfg).Answer(ctx, key, question)` |
 | `internal/codex/runner.go` | `RunNew()` / `RunResume()` — wraps `codex exec`, parses JSON stdout |
@@ -50,13 +52,24 @@ cmd/askplanner_migrate_userdata ─┤
 | `cmd/askplanner_migrate_userdata/main.go` | User-data migration CLI for copying `.askplanner` state to a new root |
 | `internal/migration/askplanner.go` | Migration logic: copy user data, rewrite workspace symlinks, skip managed repo mirrors/worktrees |
 
+## Domain Assets
+
+| Path | Purpose |
+|---|---|
+| `skills/tidb-backup-restore/` | Primary Ask BR skill, playbooks, component/workflow refs, and sanitized BR/PITR precedent corpus |
+| `skills/tidb-backup-restore/references/playbooks/` | Generated and curated precedent indexes for BR issues and GTOC tickets |
+| `skills/tidb-backup-restore/references/cases/` | Sanitized issue/ticket cases for symptom matching |
+| `contrib/tidb` | TiDB source — BR, PITR, Lightning, metadata, GC, and restore implementation truth |
+| `contrib/tidb-docs` | Official TiDB docs for documented backup/restore behavior |
+| `contrib/agent-rules` | Compatibility managed repo for older flows and generic shared references; not the Ask BR skill source |
+
 ## contrib/ Submodules
 
 | Submodule | Source | Purpose |
 |---|---|---|
-| `contrib/agent-rules` | `pingcap/agent-rules` | Skills library: oncall patterns, diagnostic workflows |
-| `contrib/tidb` | `pingcap/tidb` | TiDB source — optimizer internals ground truth |
-| `contrib/tidb-docs` | `pingcap/docs` | Official TiDB docs for SQL syntax, hints, best practices |
+| `contrib/agent-rules` | `pingcap/agent-rules` | Compatibility managed repo; Ask BR skills live in `skills/tidb-backup-restore/` |
+| `contrib/tidb` | `pingcap/tidb` | TiDB source — BR, restore, PITR, Lightning, and metadata implementation truth |
+| `contrib/tidb-docs` | `pingcap/docs` | Official TiDB docs for backup, restore, PITR, Lightning, storage, and operations |
 
 Codex CLI `WorkDir` = project root, so it reads `contrib/` via shell commands (`rg`, `cat`, etc.).
 
@@ -103,7 +116,7 @@ Lint uses `golangci-lint` via `go run github.com/golangci/golangci-lint/v2/cmd/g
 | `WORKSPACE_ROOT` | `.askplanner/workspaces` | Per-user workspace root |
 | `WORKSPACE_IDLE_TTL_HOURS` | `72` | Idle workspace TTL |
 | `WORKSPACE_GC_INTERVAL_MIN` | `15` | Workspace GC interval |
-| `AGENT_RULES_SYNC_INTERVAL_MIN` | `10` | `agent-rules` mirror sync interval |
+| `AGENT_RULES_SYNC_INTERVAL_MIN` | `10` | Legacy compatibility setting; Ask BR no longer auto-syncs `agent-rules` |
 | `WORKSPACE_REPO_TIDB_URL` | `https://gh-proxy.org/https://github.com/pingcap/tidb.git` | TiDB mirror remote |
 | `WORKSPACE_REPO_TIDB_DEFAULT_REF` | `master` | Default TiDB ref |
 | `WORKSPACE_REPO_AGENT_RULES_URL` | `https://gh-proxy.org/https://github.com/pingcap/agent-rules.git` | Agent rules mirror remote |
@@ -115,7 +128,7 @@ Lint uses `golangci-lint` via `go run github.com/golangci/golangci-lint/v2/cmd/g
 | `CLINIC_HTTP_TIMEOUT_SEC` | `15` | Clinic API timeout |
 | `CLINIC_STORE_DIR` | `<WORKSPACE_ROOT>/clinic` | Stored Clinic snapshots |
 | `CLINIC_STORE_MAX_ITEMS` | `50` | Max Clinic snapshots per user |
-| `FEISHU_BOT_NAME` | `askplanner` | Group @ detection fallback name |
+| `FEISHU_BOT_NAME` | `askbr` | Group @ detection fallback name |
 | `FEISHU_DEDUP_MESSAGE_TIMEOUT_IN_MIN` | `3600` | Dedup window in minutes |
 | `FEISHU_FILE_DIR` | `<WORKSPACE_ROOT>/uploads` | Imported Feishu attachment root |
 | `FEISHU_USER_FILE_MAX_ITEMS` | `100` | Max stored attachments per user |
@@ -158,7 +171,7 @@ Each Lark bot user gets an isolated workspace so Codex CLI can explore TiDB sour
 | `Reset` | `/ws reset [repo\|all]` | Reverts repo(s) to their default branch/ref. |
 | `GC Sweep` | Background timer (`WORKSPACE_GC_INTERVAL_MIN`) | Scans `users/`, removes workspaces idle longer than `WORKSPACE_IDLE_TTL_HOURS`. Uses non-blocking lock — skips busy users. |
 
-`agent-rules` mirror is also synced on a separate background timer (`AGENT_RULES_SYNC_INTERVAL_MIN`), and its worktrees track the latest default branch automatically (`TrackLatest=true`).
+`agent-rules` is retained as a compatibility managed repo. Ask BR no longer auto-syncs it or tracks its latest default branch automatically; use `/ws sync agent-rules` only for legacy workflows that explicitly need it.
 
 ### Concurrency
 
@@ -189,7 +202,7 @@ When the hash changes (e.g., user switches branches), `canResume()` in the respo
 
 ## User Data Migration
 
-Use `bin/askplanner_migrate_userdata` when you need to move persisted askplanner state to a new machine, a new deployment root, or a backup directory.
+Use `bin/askplanner_migrate_userdata` when you need to move persisted Ask BR state to a new machine, a new deployment root, or a backup directory.
 
 ```bash
 make migrate-userdata
@@ -198,7 +211,7 @@ make migrate-userdata
 
 Behavior:
 
-- Copies the askplanner data directory tree to the destination.
+- Copies the Ask BR data directory tree to the destination.
 - Preserves regular files such as `sessions.json`, `usage_questions.jsonl`, logs, attachment files, Clinic snapshots, and workspace metadata.
 - Rewrites absolute workspace symlinks like `user-files` and `clinic-files` so they point at the migrated destination tree.
 - Skips managed git data under `workspaces/mirrors/`.
@@ -206,9 +219,9 @@ Behavior:
 
 Operational notes:
 
-- Stop the running askplanner processes before migrating so session, log, and usage files are not being written during the copy.
+- Stop the running Ask BR processes before migrating so session, log, and usage files are not being written during the copy.
 - The destination must be different from the source and cannot be nested inside the source directory.
-- After migration, start askplanner with the migrated paths, for example by pointing `CODEX_SESSION_STORE`, `USAGE_QUESTIONS_PATH`, `LOG_FILE`, and `WORKSPACE_ROOT` at the new root if you are not using the default `.askplanner` layout.
+- After migration, start Ask BR with the migrated paths, for example by pointing `CODEX_SESSION_STORE`, `USAGE_QUESTIONS_PATH`, `LOG_FILE`, and `WORKSPACE_ROOT` at the new root if you are not using the default `.askplanner` layout.
 
 ## Usage Dashboard (Agent Fast Path)
 

@@ -319,7 +319,7 @@ const indexHTML = `<!doctype html>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>askplanner usage</title>
+  <title>Ask BR usage</title>
   <style>` + sharedStyle + `</style>
 </head>
 <body>
@@ -328,7 +328,7 @@ const indexHTML = `<!doctype html>
       <div class="hero-top">
         <div>
           <div class="kicker">Operations view</div>
-          <h1>askplanner live usage</h1>
+          <h1>Ask BR live usage</h1>
         </div>
         <div class="actions">
           <a class="nav-link" href="/users-by-name">Open named users</a>
@@ -513,7 +513,7 @@ const questionsHTML = `<!doctype html>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>askplanner questions</title>
+  <title>Ask BR questions</title>
   <style>` + sharedStyle + `</style>
 </head>
 <body>
@@ -653,7 +653,7 @@ const namedUsersHTML = `<!doctype html>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>askplanner named users</title>
+  <title>Ask BR named users</title>
   <style>` + sharedStyle + `</style>
 </head>
 <body>

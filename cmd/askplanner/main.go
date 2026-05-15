@@ -25,7 +25,7 @@ import (
 func main() {
 	cfg, err := config.Load()
 	if err != nil {
-		fatalStartup("load config", err, "Check PROJECT_ROOT and PROMPT_FILE, or start askplanner from the repository root.")
+		fatalStartup("load config", err, "Check PROJECT_ROOT and PROMPT_FILE, or start Ask BR from the repository root.")
 	}
 
 	logFile, err := config.SetupLogging(cfg.LogFile)
@@ -59,7 +59,7 @@ func main() {
 		log.Printf("[askplanner] usage tracker disabled: %v", err)
 	}
 
-	fmt.Printf("askplanner v2 (backend: codex-cli, model: %s)\n", cfg.CodexModel)
+	fmt.Printf("Ask BR (backend: codex-cli, model: %s)\n", cfg.CodexModel)
 	fmt.Println("Type your question, or 'quit' to exit. Use 'reset' to start a new session. Use '/model' to inspect or switch the model for this conversation.")
 	fmt.Println()
 

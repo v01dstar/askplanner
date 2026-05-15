@@ -198,8 +198,8 @@ func containsAll(s string, parts ...string) bool {
 func testUsageAuthConfig(password string) *config.Config {
 	sum := sha256.Sum256([]byte(password))
 	return &config.Config{
-		UsageAuthUsername:       "askplanner",
+		UsageAuthUsername:       "askbr",
 		UsageAuthPasswordSHA256: hex.EncodeToString(sum[:]),
-		UsageAuthRealm:          "askplanner dashboard - contact guojiangtao for access",
+		UsageAuthRealm:          "Ask BR dashboard - contact guojiangtao for access",
 	}
 }

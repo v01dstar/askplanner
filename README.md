@@ -1,74 +1,51 @@
-# askplanner
+# Ask BR
 
-An AI assistant for TiDB query optimizer questions.
+An AI assistant for TiDB backup/restore, PITR, log backup, and TiDB Lightning import diagnosis.
 
-The current runtime uses Codex CLI as the primary agent engine. askplanner's domain value comes from a generated system prompt, a curated skills corpus, a curated TiDB SQL tuning docs overlay, and access to the local TiDB source tree.
+The current runtime uses Codex CLI as the primary agent engine. Ask BR's domain value comes from a generated system prompt, the local `skills/tidb-backup-restore/` corpus, curated BR/PITR precedent cases, official TiDB docs, and access to the local TiDB source tree.
+
+The historical Go module, binaries, and default state directory still use `askplanner` / `.askplanner` for compatibility. User-facing docs and prompts should call the product **Ask BR** unless referring to an actual path, binary, package, or migration tool.
 
 Here is an example of how to use it:
 ````text
 [Yes VPN-ON] [2026/03/19 6:32:52 Day-078] 192 :: ~/work/askplanner_v2 ‹main*› » ./bin/askplanner_cli
-askplanner v2 (backend: codex-cli, model: gpt-5.3-codex)
+Ask BR (backend: codex-cli, model: gpt-5.3-codex)
 Type your question, or 'quit' to exit. Use 'reset' to start a new session. Use '/model' to inspect or switch the model for this conversation.
 
 > hi
 
 
-Hi, I’m here. Share your SQL and `EXPLAIN ANALYZE`, and I’ll help tune it.
+Hi, I’m here. Share the BR/PITR/restore symptom, versions, command, and logs, and I’ll help triage it.
 
 Refined English: Hi.
 
-> how to optimize a query like 'select * from tbl_a where a < 10 or b > 100;'
+> PITR restore failed with [BR:Common:ErrInvalidArgument]. What should I check?
 
 
-For TiDB, this pattern is usually optimized in this order:
+For PITR failures with `[BR:Common:ErrInvalidArgument]`, I would classify this as a restore/PITR incident first and preserve the current restore state before retrying.
 
-1. Refresh stats first (most important).
-```sql
-ANALYZE TABLE tbl_a;
-EXPLAIN ANALYZE SELECT * FROM tbl_a WHERE a < 10 OR b > 100;
-```
+1. Confirm the architecture and versions: TiDBX or Classic, TiDB/PD/TiKV/BR versions, and whether TiDB Operator is involved.
+2. Preserve BR logs, restore command, backup metadata path, and log backup task status.
+3. Check target restore timestamp, log backup checkpoint continuity, GC safepoint, and whether the base snapshot and log backup belong to the same cluster lineage.
+4. Search `skills/tidb-backup-restore/references/cases/` for the exact error and nearby PITR symptoms before choosing a workaround.
 
-2. Make sure both predicates are indexable.
-```sql
-CREATE INDEX idx_a ON tbl_a(a);
-CREATE INDEX idx_b ON tbl_a(b);
-```
-
-3. Let TiDB use union-type `IndexMerge` for `OR` (if cost model does not pick it automatically).
-```sql
-EXPLAIN ANALYZE
-SELECT /*+ USE_INDEX_MERGE(tbl_a, idx_a, idx_b) */ *
-FROM tbl_a
-WHERE a < 10 OR b > 100;
-```
-
-4. If `IndexMerge` is still slower, rewrite to `UNION ALL` (keeps two range scans, avoids full scan):
-```sql
-SELECT * FROM tbl_a WHERE a < 10
-UNION ALL
-SELECT * FROM tbl_a WHERE b > 100 AND NOT (a < 10);
-```
-
-Practical notes:
-- `SELECT *` often forces table row fetch (`TableRowIDScan`), so speedup might be limited. If possible, select only needed columns.
-- In `EXPLAIN ANALYZE`, look for `IndexMerge ... type: union` and check actual time/rows before deciding final form.
-- On TiDB v8.1+, auto choice of IndexMerge can be improved by fix control `52869`, but test carefully before enabling globally.
+The smallest useful next input is the full BR error block plus the restore command with credentials, bucket names, cluster IDs, and internal links redacted.
 ````
 
 ## How It Works
 
-1. A user asks a TiDB optimizer question in the local REPL or in Lark.
-2. askplanner loads the domain prompt from `prompt` or falls back to the in-process prompt builder.
-3. For Lark bot users, askplanner provisions a **per-user workspace** with isolated git worktrees of TiDB source, docs, and agent-rules (shared bare mirrors avoid full clones per user). Users can switch repo versions via `/ws switch tidb <ref>`. The workspace state is tracked in `workspace.json` and influences session resumption through an environment hash.
-4. The prompt is normalized for Codex CLI. askplanner-specific tool references such as `read_file` and `search_docs` are translated into shell-based workspace exploration rules.
-5. askplanner starts a new Codex session with `codex exec` or resumes an existing one with `codex exec resume`.
+1. A user asks a TiDB backup/restore question in the local REPL or in Lark.
+2. Ask BR loads the domain prompt from `prompt` or falls back to the in-process prompt builder.
+3. For Lark bot users, the relay provisions a **per-user workspace** with isolated git worktrees of TiDB source and docs (shared bare mirrors avoid full clones per user). Users can switch repo versions via `/ws switch tidb <ref>`. The workspace state is tracked in `workspace.json` and influences session resumption through an environment hash. `agent-rules` may still be present as a compatibility managed repo, but Ask BR skills live in this repository under `skills/tidb-backup-restore/`.
+4. The prompt is normalized for Codex CLI. Tool references such as `read_file` and `search_docs` are translated into shell-based workspace exploration rules.
+5. The relay starts a new Codex session with `codex exec` or resumes an existing one with `codex exec resume`.
 6. Codex reads local skills, local TiDB docs, and local TiDB source code from the workspace and returns the answer.
-7. askplanner persists the conversation's `session_id` in `.askplanner/sessions.json` so later turns can reuse the same Codex thread.
+7. The relay persists the conversation's `session_id` in `.askplanner/sessions.json` so later turns can reuse the same Codex thread.
 
 The runtime is intentionally simple:
 - No custom MCP tool bridge yet.
 - No in-process LLM API client for the main runtime path.
-- No askplanner-managed tool loop on the hot path.
+- No relay-managed tool loop on the hot path.
 
 ## Architecture
 
@@ -77,15 +54,15 @@ The runtime is intentionally simple:
 - `cmd/askplanner` is the local REPL
 - `cmd/larkbot` is the Feishu/Lark websocket bot
 - `cmd/askplanner_usage` is the local usage dashboard web server
-- `cmd/askplanner_migrate_userdata` copies persisted askplanner user data to a new root
+- `cmd/askplanner_migrate_userdata` copies persisted Ask BR user data to a new root
 - `internal/codex` is the active runtime
 
 ### Core Principle
 
 Codex CLI is the agent runtime.
 
-askplanner is the relay and domain-context layer:
-- it prepares the TiDB tuning prompt
+Ask BR is the relay and domain-context layer:
+- it prepares the TiDB backup/restore prompt
 - it normalizes that prompt for Codex
 - it manages session reuse
 - it wires user transport to Codex CLI
@@ -95,13 +72,13 @@ reference AGENTS.md for detailed
 
 ## Skills and Docs
 
-askplanner still uses the same domain assets:
+Ask BR uses these domain assets:
 
 - `skills/tidb-backup-restore/`
-- `contrib/agent-rules/skills/tidb-query-tuning/references/`
 - `contrib/tidb/`
 - `contrib/tidb-docs/`
-- `prompts/tidb-query-tuning-official-docs/`
+
+`contrib/agent-rules/` is retained as a compatibility workspace repo for older flows and generic shared references. Do not rely on it as the source of Ask BR skills.
 
 `skills/tidb-backup-restore/` currently includes a bootstrap corpus of sanitized and title-normalized BR/PITR tickets and issues. Going forward, keep durable skill instructions in git and place large regenerated reference corpora in local storage such as `.askplanner/skill-references/` or `skills/<skill>/local-references/`; those paths are ignored and can be populated during repo initialization.
 
@@ -113,7 +90,7 @@ The key distinction is that the current runtime does not expose `read_file`, `se
 - Codex CLI installed and authenticated via `codex login`
 - TiDB source code available at `contrib/tidb/`
 - TiDB docs available at `contrib/tidb-docs/` for the docs overlay
-- Skills repo available at `contrib/agent-rules/` (git submodule)
+- Ask BR skill corpus available at `skills/tidb-backup-restore/`
 - For Lark bot: a Feishu/Lark app with websocket event subscription enabled
 
 ## Quick Start
@@ -143,7 +120,7 @@ make
 
 ## Usage Dashboard
 
-askplanner includes a local usage dashboard for lightweight observability.
+Ask BR includes a local usage dashboard for lightweight observability.
 
 - Binary: `bin/askplanner_usage`
 - Default address: `http://127.0.0.1:18080`
@@ -177,7 +154,7 @@ The REPL supports:
 
 ## User Data Migration
 
-askplanner stores runtime state under `.askplanner/` by default. That state usually includes:
+Ask BR stores runtime state under `.askplanner/` by default. That state usually includes:
 
 - `sessions.json`
 - `usage_questions.jsonl`
@@ -201,24 +178,24 @@ go run ./cmd/askplanner_migrate_userdata --source .askplanner /path/to/askplanne
 
 What the tool does:
 
-- Recursively copies the source askplanner data directory to the destination.
+- Recursively copies the source Ask BR data directory to the destination.
 - Preserves normal files and directories, including sessions, usage events, logs, uploaded files, Clinic snapshots, and workspace metadata.
 - Rewrites absolute workspace symlinks such as `user-files` and `clinic-files` so they remain valid under the destination root.
 - Skips managed repository data under `workspaces/mirrors/`.
-- Skips managed worktrees under `workspaces/users/*/root/contrib/{tidb,tidb-docs,agent-rules}` because askplanner can recreate them from the configured remotes.
+- Skips managed worktrees under `workspaces/users/*/root/contrib/{tidb,tidb-docs,agent-rules}` because Ask BR can recreate them from the configured remotes.
 
 Recommended migration procedure:
 
 1. Stop `askplanner_cli`, `askplanner_larkbot`, and `askplanner_usage`.
 2. Run `./bin/askplanner_migrate_userdata --source <old_data_dir> <new_data_dir>`.
 3. Point the new deployment at the migrated directory, or move the migrated tree into the default `.askplanner` location.
-4. Start askplanner and run `/ws status` for one Lark user or send a test question so managed worktrees are recreated as needed.
+4. Start Ask BR and run `/ws status` for one Lark user or send a test question so managed worktrees are recreated as needed.
 
 Constraints:
 
 - The destination directory must be different from the source.
 - The destination cannot be inside the source directory.
-- The tool is for askplanner's persisted runtime data, not for the top-level git repo.
+- The tool is for Ask BR's persisted runtime data, not for the top-level git repo.
 - Managed repo mirrors/worktrees are intentionally not copied; the first workspace `Ensure`, `/ws sync`, or `/ws switch` will recreate or refresh them.
 
 ## Lark Bot
@@ -234,7 +211,7 @@ Run:
 ```bash
 FEISHU_APP_ID="cli_xxxx" \
 FEISHU_APP_SECRET="xxxx" \
-FEISHU_BOT_NAME="askplanner" \
+FEISHU_BOT_NAME="askbr" \
 ./bin/askplanner_larkbot
 ```
 
@@ -242,15 +219,15 @@ Or run multiple bots in one process:
 
 ```bash
 FEISHU_BOTS_JSON='[
-  {"key":"bot-a","app_id":"cli_xxxx","app_secret":"xxxx","bot_name":"askplanner-a"},
-  {"key":"bot-b","app_id":"cli_yyyy","app_secret":"yyyy","bot_name":"askplanner-b"}
+  {"key":"bot-a","app_id":"cli_xxxx","app_secret":"xxxx","bot_name":"askbr-a"},
+  {"key":"bot-b","app_id":"cli_yyyy","app_secret":"yyyy","bot_name":"askbr-b"}
 ]' \
 ./bin/askplanner_larkbot
 ```
 
-In group chats, the bot only handles `text` and `post` rich-text messages that are explicitly addressed to it. The most reliable setup is to configure `FEISHU_BOT_NAME` (defaults to `askplanner`) so the bot can verify that the mention target is actually itself by matching the `name` field in the mentions list.
+In group chats, the bot only handles `text` and `post` rich-text messages that are explicitly addressed to it. The most reliable setup is to configure `FEISHU_BOT_NAME` (defaults to `askbr`) so the bot can verify that the mention target is actually itself by matching the `name` field in the mentions list.
 
-When `FEISHU_BOTS_JSON` is used, each bot gets its own logical namespace in conversation keys, session keys, workspaces, and attachment libraries, while still sharing the same askplanner process and storage formats.
+When `FEISHU_BOTS_JSON` is used, each bot gets its own logical namespace in conversation keys, session keys, workspaces, and attachment libraries, while still sharing the same Ask BR process and storage formats.
 
 The bot stores attachments in a persistent per-user library under `FEISHU_FILE_DIR`. Each sender gets a separate directory, and the library keeps at most `FEISHU_USER_FILE_MAX_ITEMS` top-level items (default `100`). When the limit is exceeded, the oldest top-level items are deleted first.
 
@@ -318,7 +295,7 @@ Workspace variables:
 | `WORKSPACE_ROOT` | `.askplanner/workspaces` | Per-user workspace root |
 | `WORKSPACE_IDLE_TTL_HOURS` | `72` | Idle workspace TTL before GC |
 | `WORKSPACE_GC_INTERVAL_MIN` | `15` | Workspace GC sweep interval |
-| `AGENT_RULES_SYNC_INTERVAL_MIN` | `10` | `agent-rules` mirror sync interval |
+| `AGENT_RULES_SYNC_INTERVAL_MIN` | `10` | Legacy compatibility setting; Ask BR no longer auto-syncs `agent-rules` |
 | `WORKSPACE_REPO_TIDB_URL` | (gh-proxy mirror) | TiDB mirror remote |
 | `WORKSPACE_REPO_TIDB_DEFAULT_REF` | `master` | Default TiDB ref |
 | `WORKSPACE_REPO_AGENT_RULES_URL` | (gh-proxy mirror) | Agent rules mirror remote |
@@ -340,10 +317,10 @@ Lark-specific variables:
 
 | Env Var | Required | Description |
 |--------|----------|-------------|
-| `FEISHU_BOTS_JSON` | No | JSON array of bot configs for multi-bot mode; when set, askplanner ignores the single-bot Feishu credential vars |
+| `FEISHU_BOTS_JSON` | No | JSON array of bot configs for multi-bot mode; when set, Ask BR ignores the single-bot Feishu credential vars |
 | `FEISHU_APP_ID` | Yes* | Feishu app ID in legacy single-bot mode |
 | `FEISHU_APP_SECRET` | Yes* | Feishu app secret in legacy single-bot mode |
-| `FEISHU_BOT_NAME` | No | Bot display name for group-chat mention matching; defaults to `askplanner` |
+| `FEISHU_BOT_NAME` | No | Bot display name for group-chat mention matching; defaults to `askbr` |
 | `FEISHU_DEDUP_MESSAGE_TIMEOUT_IN_MIN` | No | Dedup window in minutes; defaults to `3600` |
 | `FEISHU_FILE_DIR` | No | Per-user attachment library root; defaults to `<WORKSPACE_ROOT>/uploads` |
 | `FEISHU_USER_FILE_MAX_ITEMS` | No | Max top-level items per user library; defaults to `100` |
@@ -372,7 +349,7 @@ go test ./...
 - [ ] support context management
 - [ ] slow query finder
 - [ ] optimize the response time, especially the first user input request
-- [ ] add a watchdog/daemon to keep the askplanner background process alive
+- [ ] add a watchdog/daemon to keep the Ask BR background process alive
 - [ ] support audit storage, which record all question, data
 
 ### implementation perspective

@@ -12,11 +12,11 @@
 - Feishu 环境变量：EC2 用户的 `~/.bashrc`
 - Codex 账号：当前使用 Andy 的个人 Codex 账号
 - Feishu bot 管理人：Andy
-- skills 来源：`https://github.com/pingcap/agent-rules`
+- skills 来源：本仓库 `skills/tidb-backup-restore/`
 
 ## 架构简述
 
-ask-br-bot 是 askplanner 的 Feishu/Lark bot 运行形态。用户在 Feishu 里提问后，后端通过 Feishu websocket 长连接收到 message event，然后把问题交给 Codex CLI，最后把 Codex 的回答回复到 Feishu。
+ask-br-bot 是 Ask BR 的 Feishu/Lark bot 运行形态。用户在 Feishu 里提问后，后端通过 Feishu websocket 长连接收到 message event，然后把问题交给 Codex CLI，最后把 Codex 的回答回复到 Feishu。
 
 关键链路：
 
@@ -100,24 +100,20 @@ gh auth login
 
 ## 更新 skills
 
-askplanner 的 skills 由 `agent-rules` 提供。新增或修改 BR 相关 skills 时，优先提交到：
-
-```text
-https://github.com/pingcap/agent-rules
-```
+Ask BR 的主 skill 在本仓库 `skills/tidb-backup-restore/`。`contrib/agent-rules` 可能仍作为兼容 managed repo 存在，但现在不要把它当作 Ask BR skill 来源。
 
 上线步骤：
 
-1. 合并 `agent-rules` 变更到默认分支。
+1. 合并本仓库里的 `prompt` 或 `skills/tidb-backup-restore/` 变更。
 2. 登录 EC2 并进入 `ask-br-bot` tmux session。
-3. 重启 askplanner 进程，让进程重新加载配置和 prompt。
-4. 在 Feishu 里发一条测试问题，或使用 `/ws sync agent-rules` 强制刷新当前用户 workspace 的 `agent-rules`。
+3. 重启 Ask BR 进程，让进程重新加载配置和 prompt。
+4. 在 Feishu 里发一条测试问题。修改本仓库内置 skill 不需要 `/ws sync agent-rules`。
 
 注意：
 
-- `agent-rules` mirror 会按 `AGENT_RULES_SYNC_INTERVAL_MIN` 定期同步，默认 10 分钟。
-- 每个 Feishu 用户都有自己的 workspace，里面的 `contrib/agent-rules` 是从共享 mirror checkout 出来的。
-- workspace 的 environment hash 变化后，askplanner 会避免复用旧 Codex session，防止继续沿用旧源码/旧 skills 上下文。
+- `agent-rules` mirror 现在不会为了 Ask BR 自动定期同步；只有明确执行 `/ws sync agent-rules` 时才会刷新。
+- 每个 Feishu 用户都有自己的 workspace；其中的 `contrib/agent-rules` 不应被视为 Ask BR 的主知识源。
+- workspace 的 environment hash 变化后，Ask BR 会避免复用旧 Codex session，防止继续沿用旧源码/旧 skills 上下文。
 
 ## Feishu 配置
 
@@ -129,7 +125,7 @@ export FEISHU_APP_SECRET=...
 export FEISHU_BOT_NAME=ask-br-bot
 ```
 
-常见 Codex/askplanner 配置：
+常见 Codex/Ask BR 配置：
 
 ```bash
 export CODEX_BIN=codex
@@ -177,7 +173,7 @@ grep -E 'startup error|websocket client failed|handle event error|codex|workspac
 - websocket 连接失败：检查 Feishu app secret、event subscription、EC2 出站网络和 DNS。
 - 群聊不响应：检查是否 @ 了 bot，以及 `FEISHU_BOT_NAME` 是否等于 bot 在 Feishu 群里的显示名。
 - Codex 调用超时：检查 `CODEX_TIMEOUT_SEC`、Codex 账号登录状态、机器网络，以及是否有大附件或大 workspace 操作。
-- skills 更新后没生效：重启 larkbot，并让用户发 `/ws sync agent-rules` 或新开一次对话测试。
+- skills 更新后没生效：重启 larkbot，并新开一次对话测试；如果只改了本仓库 `skills/tidb-backup-restore/`，不需要同步 `agent-rules`。
 
 ## 快速健康检查
 
@@ -196,4 +192,4 @@ grep -E 'startup error|websocket client failed|handle event error|codex|workspac
 - Feishu app secret 在 EC2 `~/.bashrc`，不要复制到聊天或文档。
 - Codex 目前是个人账号，重启或迁移机器前要确认 `codex login` 状态。
 - 更新 private repo 代码前确认 EC2 上 `gh auth status` 正常。
-- 修改 `prompt`、`agent-rules`、workspace repo ref 后，旧 Codex session 可能失效，这是预期行为。
+- 修改 `prompt`、`skills/tidb-backup-restore/`、workspace repo ref 后，旧 Codex session 可能失效，这是预期行为。
