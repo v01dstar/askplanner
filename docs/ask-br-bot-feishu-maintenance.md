@@ -131,7 +131,17 @@ Ask BR 的主 skill 在本仓库 `skills/tidb-backup-restore/`。`contrib/agent-
 
 - `agent-rules` mirror 现在不会为了 Ask BR 自动定期同步；只有明确执行 `/ws sync agent-rules` 时才会刷新。
 - 每个 Feishu 用户都有自己的 workspace；其中的 `contrib/agent-rules` 不应被视为 Ask BR 的主知识源。
+- 每个用户 workspace 的 root 会自动创建 `skills -> <PROJECT_ROOT>/skills` 软链。Codex CLI 实际运行在用户隔离 workspace 内，因此这个软链必须存在，否则 prompt 中的 `skills/tidb-backup-restore/...` 相对路径会不可见，导致本地案例库误报“查不到”。
 - workspace 的 environment hash 变化后，Ask BR 会避免复用旧 Codex session，防止继续沿用旧源码/旧 skills 上下文。
+
+验证方式：
+
+```bash
+find .askplanner/workspaces/users -maxdepth 3 -name skills -type l -print | head
+readlink .askplanner/workspaces/users/<user_key>/root/skills
+```
+
+如果已有用户 workspace 缺少 `skills` 软链，拉取包含该修复的代码并重启 larkbot 后，下一次用户提问或 `/ws status` 会触发 `Ensure` 自动补齐。
 
 ## Feishu 配置
 
@@ -192,6 +202,7 @@ grep -E 'startup error|websocket client failed|handle event error|codex|workspac
 - 群聊不响应：检查是否 @ 了 bot，以及 `FEISHU_BOT_NAME` 是否等于 bot 在 Feishu 群里的显示名。
 - Codex 调用超时：检查 `CODEX_TIMEOUT_SEC`、Codex 账号登录状态、机器网络，以及是否有大附件或大 workspace 操作。
 - skills 更新后没生效：重启 larkbot，并新开一次对话测试；如果只改了本仓库 `skills/tidb-backup-restore/`，不需要同步 `agent-rules`。
+- Codex 回答说 `skills/tidb-backup-restore` 不在工作区：确认线上代码已包含 workspace `skills` 软链修复，重启 larkbot 后触发一次 `/ws status` 或新问题，让 `Ensure` 补齐 `<user>/root/skills`。
 - 回答仍像 SQL tuning bot：确认线上代码已拉到 Ask BR 化提交，`prompt` 包含 `You are Ask BR`，并重启 larkbot。旧 Codex session 可能仍带旧 prompt，必要时让用户新开会话或执行重置。
 - workspace env hash 因 `agent-rules` 变化而频繁失效：确认线上代码包含关闭 `agent-rules` 自动同步的版本；Ask BR 不应再因为兼容 repo 自动刷新而失效旧会话。
 

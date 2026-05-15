@@ -43,6 +43,11 @@ func TestEnsureSwitchAndAgentRulesRefresh(t *testing.T) {
 	if _, err := os.Lstat(filepath.Join(ws.RootDir, "user-files")); err != nil {
 		t.Fatalf("expected user-files symlink: %v", err)
 	}
+	if target, err := os.Readlink(filepath.Join(ws.RootDir, "skills")); err != nil {
+		t.Fatalf("expected skills symlink: %v", err)
+	} else if target != filepath.Join(root, "skills") {
+		t.Fatalf("skills symlink = %q, want %q", target, filepath.Join(root, "skills"))
+	}
 
 	switched, changed, err := manager.SwitchRepo(ctx, "ou_test-user", "tidb", "release-8.5")
 	if err != nil {
@@ -154,6 +159,9 @@ func findRepo(ws *Workspace, name string) RepoState {
 
 func newTestManager(t *testing.T, root string) *Manager {
 	t.Helper()
+	if err := os.MkdirAll(filepath.Join(root, "skills"), 0o755); err != nil {
+		t.Fatalf("create skills dir: %v", err)
+	}
 	manager, err := NewManager(&config.Config{
 		ProjectRoot:                       root,
 		WorkspaceRoot:                     filepath.Join(root, "workspaces"),

@@ -66,6 +66,7 @@ type Manager struct {
 	trashDir   string
 	uploadRoot string
 	clinicRoot string
+	skillsRoot string
 	idleTTL    time.Duration
 	gcInterval time.Duration
 	repos      map[string]RepoSpec
@@ -89,6 +90,7 @@ func NewManager(cfg *config.Config) (*Manager, error) {
 		trashDir:   filepath.Join(rootDir, ".trash"),
 		uploadRoot: cfg.FeishuFileDir,
 		clinicRoot: cfg.ClinicStoreDir,
+		skillsRoot: filepath.Join(cfg.ProjectRoot, "skills"),
 		idleTTL:    time.Duration(cfg.WorkspaceIdleTTLHours) * time.Hour,
 		gcInterval: time.Duration(cfg.WorkspaceGCIntervalMin) * time.Minute,
 		repos: map[string]RepoSpec{
@@ -130,6 +132,11 @@ func NewManager(cfg *config.Config) (*Manager, error) {
 		if spec.DefaultRef == "" {
 			return nil, fmt.Errorf("workspace repo %s default ref is empty", spec.Name)
 		}
+	}
+	if info, err := os.Stat(m.skillsRoot); err != nil {
+		return nil, fmt.Errorf("workspace skills root %s is unavailable: %w", m.skillsRoot, err)
+	} else if !info.IsDir() {
+		return nil, fmt.Errorf("workspace skills root %s is not a directory", m.skillsRoot)
 	}
 
 	return m, nil
@@ -578,6 +585,9 @@ func (m *Manager) ensureMetadata(userKey string) (*workspaceMetadata, workspaceD
 		return nil, workspaceDirs{}, err
 	}
 	if err := ensureSymlink(dirs.clinicDir, filepath.Join(dirs.rootDir, "clinic-files")); err != nil {
+		return nil, workspaceDirs{}, err
+	}
+	if err := ensureSymlink(m.skillsRoot, filepath.Join(dirs.rootDir, "skills")); err != nil {
 		return nil, workspaceDirs{}, err
 	}
 

@@ -3,6 +3,7 @@ package larkbot
 import (
 	"context"
 	"errors"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -78,7 +79,11 @@ func TestMessageDedupIsIndependentPerBotRuntime(t *testing.T) {
 func newTestWorkspaceManager(t *testing.T) *workspace.Manager {
 	t.Helper()
 	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "skills"), 0o755); err != nil {
+		t.Fatalf("create skills dir: %v", err)
+	}
 	cfg := &config.Config{
+		ProjectRoot:                       root,
 		WorkspaceRoot:                     filepath.Join(root, "workspaces"),
 		FeishuFileDir:                     filepath.Join(root, "uploads"),
 		ClinicStoreDir:                    filepath.Join(root, "clinic"),
