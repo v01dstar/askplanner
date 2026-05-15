@@ -97,10 +97,13 @@ reference AGENTS.md for detailed
 
 askplanner still uses the same domain assets:
 
+- `skills/tidb-backup-restore/`
 - `contrib/agent-rules/skills/tidb-query-tuning/references/`
 - `contrib/tidb/`
 - `contrib/tidb-docs/`
 - `prompts/tidb-query-tuning-official-docs/`
+
+`skills/tidb-backup-restore/` currently includes a bootstrap corpus of sanitized and title-normalized BR/PITR tickets and issues. Going forward, keep durable skill instructions in git and place large regenerated reference corpora in local storage such as `.askplanner/skill-references/` or `skills/<skill>/local-references/`; those paths are ignored and can be populated during repo initialization.
 
 The key distinction is that the current runtime does not expose `read_file`, `search_code`, `list_dir`, `list_skills`, `read_skill`, or `search_docs` as live model tools. Instead, the normalized prompt instructs Codex to inspect those assets directly through the local workspace.
 

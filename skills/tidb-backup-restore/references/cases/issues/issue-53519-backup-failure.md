@@ -1,0 +1,72 @@
+# Issue 53519: Backup failure
+
+## Source
+
+- GitHub issue: https://github.com/pingcap/tidb/issues/53519
+- State: CLOSED
+- Author: [REDACTED_USER]
+- Created: 2024-05-24T01:41:11Z
+- Updated: 2024-06-06T03:50:57Z
+- Closed: 2024-06-06T03:50:57Z
+- Generated: 2026-05-15T00:20:39Z
+
+## Classification
+
+- Architecture: Unknown
+- Operation: Backup
+- Components: TiDB, BR
+- Categories: backup-failure, checkpoint-retry
+- Labels: component/br, may-affects-5.4, may-affects-6.1, may-affects-6.5, may-affects-7.1, may-affects-7.5, may-affects-8.1, severity/major, type/bug
+- Affected versions: may-affects-5.4, may-affects-6.1, may-affects-6.5, may-affects-7.1, may-affects-7.5, may-affects-8.1
+
+## Quick Match
+
+- Title/error signature: `Backup failure`
+- Search terms: BR; Backup; TiDB; backup-failure; checkpoint-retry
+
+## Linked PRs Mentioned In Body
+
+- N/A
+
+## Issue Body
+
+## Bug Report
+
+Please answer these questions before submitting your issue. Thanks!
+
+### 1. [REDACTED_USER]
+1、run br back up
+2、inject network partition to br and then recover
+ha test case config：
+      - name: [REDACTED_RESOURCE_NAME]
+        faultType: network_partition
+        selector: br_to_all
+        warmUpTime: 1m
+        period: "@every 3m"
+        faultDuration: 1m
+        faultRunTimes: 5
+
+### 2. [REDACTED_USER]
+br backup can success
+
+### 3. [REDACTED_USER]
+br backup always running but can not finish after network partition recover of br node
+`[2024/05/23 12:59:44.504 +00:00] [INFO] [rtree.go:190] ["delete overlapping range"] [startKey=7480000000000000DE5F728000000003A186CD] [endKey=7480000000000000DE5F728000000003A7F3A1]
+[2024/05/23 12:59:45.921 +00:00] [INFO] [rtree.go:190] ["delete overlapping range"] [startKey=7480000000000000DE5F728000000003A7F3A1] [endKey=7480000000000000DE5F728000000003AE6075]
+[2024/05/23 12:59:46.558 +00:00] [ERROR] [client.go:962] ["store backup failed"] [round=31] [storeID=4] [error="rpc error: code = Canceled desc = grpc: the client connection is closing; rpc error: code = Canceled desc = grpc: the client connection is closing; rpc error: code = Canceled desc = grpc: the client connection is closing; rpc error: code = Canceled desc = grpc: the client connection is closing; rpc error: code = Canceled desc = grpc: the client connection is closing"] [errorVerbose="the following errors occurred:\n -  rpc error: code = Canceled desc = grpc: the client connection is closing\n -  rpc error: code = Canceled desc = grpc: the client connection is closing\n -  rpc error: code = Canceled desc = grpc: the client connection is closing\n -  rpc error: code = Canceled desc = grpc: the client connection is closing\n -  rpc error: code = Canceled desc = grpc: the client connection is closing"] [stack="github.com/pingcap/tidb/br/pkg/backup.(*Client).startMainBackupLoop.func1.1\n\t/home/jenkins/agent/workspace/build-common/go/src/github.com/pingcap/br/br/pkg/backup/client.go:962"]
+[2024/05/23 12:59:46.558 +00:00] [INFO] [client.go:948] ["exit store backup goroutine"] [store=4]
+[2024/05/23 12:59:46.558 +00:00] [INFO] [client.go:980] ["exit collect backups goroutine"] [round=31]
+[2024/05/23 12:59:46.560 +00:00] [INFO] [store_manager.go:151] ["StoreManager: dialing to store."] [address=tc-tikv-3.tc-tikv-peer.[REDACTED_RESOURCE_NAME].svc:20160] [store-id=4]
+[2024/05/23 12:59:46.562 +00:00] [INFO] [client.go:989] ["start wait store backups"] [remainingProducers=4]
+[2024/05/23 12:59:46.562 +00:00] [INFO] [push.go:124] ["try backup"] [storeID=4] ["retry time"=0]`
+
+### 4. [REDACTED_USER]
+./tidb-server -V
+ Release Version: v8.2.0-alpha
+Edition: Community
+Git Commit Hash: 53bf76f4eb6db9865fc039c25ea7f7f8ae21038b
+Git Branch: heads/refs/tags/v8.2.0-alpha
+UTC Build Time: 2024-05-21 11:46:31
+GoVersion: go1.21.10
+Race Enabled: false
+Check Table Before Drop: false

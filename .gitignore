@@ -2,3 +2,9 @@ bin/
 .askplanner/
 *.log
 tmpdocs/
+
+# Local generated skill references populated after repo init.
+# Keep durable skill instructions in git; keep future large ticket/issue
+# corpora in local storage unless intentionally promoted.
+.askplanner/skill-references/
+skills/*/local-references/

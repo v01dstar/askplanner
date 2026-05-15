@@ -1,0 +1,199 @@
+# ask-br-bot Feishu 运维文档
+
+本文记录 ask-br-bot 的后端、Feishu 事件订阅方式、EC2 部署形态和常见维护流程。不要把 `FEISHU_APP_SECRET`、Codex 登录 token、AWS key、SSH private key 等 secret 写进仓库。
+
+## 当前状态
+
+- 后端仓库：[v01dstar/askplanner](https://github.com/v01dstar/askplanner)
+- 部署位置：AWS `us-east-2` 的 EC2，AWS 账号为 `tidb-br-dev-test`
+- SSH private key：本机 `/Users/andy/Downloads/br-team.pem`
+- 运行方式：`tmux` session `ask-br-bot`
+- 启动命令约定：`tmux new -As ask-br-bot`
+- Feishu 环境变量：EC2 用户的 `~/.bashrc`
+- Codex 账号：当前使用 Andy 的个人 Codex 账号
+- Feishu bot 管理人：Andy
+- skills 来源：`https://github.com/pingcap/agent-rules`
+
+## 架构简述
+
+ask-br-bot 是 askplanner 的 Feishu/Lark bot 运行形态。用户在 Feishu 里提问后，后端通过 Feishu websocket 长连接收到 message event，然后把问题交给 Codex CLI，最后把 Codex 的回答回复到 Feishu。
+
+关键链路：
+
+1. `cmd/larkbot/main.go` 启动进程，加载环境变量，设置日志，并检查 `CODEX_BIN` 是否存在。
+2. `internal/larkbot/app.go` 创建 Lark API client 和 websocket client。
+3. websocket client 通过 `github.com/larksuite/oapi-sdk-go/v3/ws` 建立长连接。
+4. 事件处理器注册 `OnP2MessageReceiveV1`，收到 Feishu 消息后做去重、消息过滤、typing reaction、附件/workspace/Clinic 预处理。
+5. `internal/codex/responder.go` 调用 `codex exec` 或 `codex exec resume`。
+6. 结果通过 Feishu reply API 回到原消息或 thread。
+
+代码位置：
+
+- websocket client 创建：`internal/larkbot/app.go`
+- message event handler：`internal/larkbot/app.go`
+- 启动入口：`cmd/larkbot/main.go`
+- env 加载：`internal/config/config.go`
+- Feishu 消息解析和会话 key：`internal/larkbot/message.go`
+- Codex 调用：`internal/codex/runner.go`
+
+Feishu websocket 模式不需要公网 HTTP callback 地址；进程只要能从 EC2 出站连接 Feishu/Lark Open Platform 即可。实现上使用 Lark 官方 Go SDK 的 websocket client，并把 `EventDispatcher` 作为 event handler 传进去。
+
+## 登录 EC2
+
+先确认 key 权限：
+
+```bash
+chmod 400 /Users/andy/Downloads/br-team.pem
+```
+
+从 AWS 控制台进入 `tidb-br-dev-test` 账号，在 `us-east-2` 找到 ask-br-bot 对应 EC2，确认 public DNS/IP 和登录用户。常见登录用户是 `ec2-user` 或 `ubuntu`，以实例 AMI 为准。
+
+```bash
+ssh -i /Users/andy/Downloads/br-team.pem <ec2-user-or-ubuntu>@<ec2-public-dns>
+```
+
+登录后建议先确认当前进程、tmux、repo 和 env：
+
+```bash
+tmux ls
+tmux new -As ask-br-bot
+pwd
+git remote -v
+env | grep -E '^(FEISHU_|CODEX_|WORKSPACE_|AGENT_RULES_|CLINIC_|LOG_FILE|PROJECT_ROOT|PROMPT_FILE)='
+```
+
+如果 `env` 里看不到 Feishu 或 Codex 配置，先执行：
+
+```bash
+source ~/.bashrc
+```
+
+## 启停和重载
+
+进入 tmux：
+
+```bash
+tmux new -As ask-br-bot
+```
+
+如果 bot 正在前台跑，先用 `Ctrl-C` 停掉。然后在 askplanner repo 根目录更新代码、构建并启动：
+
+```bash
+source ~/.bashrc
+git status --short
+git pull --ff-only
+git submodule update --init --recursive
+make larkbot
+./bin/askplanner_larkbot
+```
+
+启动后留在 tmux 内观察日志几秒，确认没有 startup error。detach tmux 用 `Ctrl-b d`。
+
+如果代码仓库或 submodule 是 private repo，机器上可能需要 GitHub CLI 登录：
+
+```bash
+gh auth status
+gh auth login
+```
+
+也可以使用 GitHub SSH key 或 PAT，但不要把 token 写进 shell history、文档或仓库。
+
+## 更新 skills
+
+askplanner 的 skills 由 `agent-rules` 提供。新增或修改 BR 相关 skills 时，优先提交到：
+
+```text
+https://github.com/pingcap/agent-rules
+```
+
+上线步骤：
+
+1. 合并 `agent-rules` 变更到默认分支。
+2. 登录 EC2 并进入 `ask-br-bot` tmux session。
+3. 重启 askplanner 进程，让进程重新加载配置和 prompt。
+4. 在 Feishu 里发一条测试问题，或使用 `/ws sync agent-rules` 强制刷新当前用户 workspace 的 `agent-rules`。
+
+注意：
+
+- `agent-rules` mirror 会按 `AGENT_RULES_SYNC_INTERVAL_MIN` 定期同步，默认 10 分钟。
+- 每个 Feishu 用户都有自己的 workspace，里面的 `contrib/agent-rules` 是从共享 mirror checkout 出来的。
+- workspace 的 environment hash 变化后，askplanner 会避免复用旧 Codex session，防止继续沿用旧源码/旧 skills 上下文。
+
+## Feishu 配置
+
+EC2 的 `~/.bashrc` 至少需要包含：
+
+```bash
+export FEISHU_APP_ID=...
+export FEISHU_APP_SECRET=...
+export FEISHU_BOT_NAME=ask-br-bot
+```
+
+常见 Codex/askplanner 配置：
+
+```bash
+export CODEX_BIN=codex
+export CODEX_MODEL=gpt-5.3-codex
+export CODEX_REASONING_EFFORT=medium
+export CODEX_SANDBOX=read-only
+export LOG_FILE=.askplanner/askplanner.log
+```
+
+Feishu Open Platform 侧需要开启 websocket/event 订阅，并订阅接收消息事件。代码实际处理的是 `P2MessageReceiveV1`。群聊里 bot 只有在被明确 @ 时才处理消息，`FEISHU_BOT_NAME` 要和群里显示名匹配，否则 mention 检测可能失败。
+
+## Codex 账号维护
+
+当前 EC2 上 Codex CLI 使用 Andy 的个人账号。需要检查登录状态时：
+
+```bash
+codex --version
+codex login status
+```
+
+如果 Codex CLI 不支持 `login status`，直接发一条 Feishu 测试问题并查看 `.askplanner/askplanner.log`。如果认证失效，需要在 EC2 上重新执行 `codex login`，按 CLI 提示完成认证。
+
+长期建议把生产 bot 切到团队可维护的 Codex/OpenAI 账号，避免个人账号离职、权限变更或 token 过期影响服务。
+
+## 日志和排障
+
+默认日志路径：
+
+```bash
+.askplanner/askplanner.log
+```
+
+常用命令：
+
+```bash
+tail -f .askplanner/askplanner.log
+tail -n 200 .askplanner/askplanner.log
+grep -E 'startup error|websocket client failed|handle event error|codex|workspace' .askplanner/askplanner.log | tail -n 100
+```
+
+常见问题：
+
+- 启动时报 `FEISHU_APP_ID and FEISHU_APP_SECRET are required`：没有 `source ~/.bashrc`，或 `.bashrc` 里缺 Feishu env。
+- 启动时报 `locate Codex CLI`：`codex` 不在 `PATH`，或 `CODEX_BIN` 配错。
+- websocket 连接失败：检查 Feishu app secret、event subscription、EC2 出站网络和 DNS。
+- 群聊不响应：检查是否 @ 了 bot，以及 `FEISHU_BOT_NAME` 是否等于 bot 在 Feishu 群里的显示名。
+- Codex 调用超时：检查 `CODEX_TIMEOUT_SEC`、Codex 账号登录状态、机器网络，以及是否有大附件或大 workspace 操作。
+- skills 更新后没生效：重启 larkbot，并让用户发 `/ws sync agent-rules` 或新开一次对话测试。
+
+## 快速健康检查
+
+部署或重启后，按顺序检查：
+
+1. `tmux ls` 能看到 `ask-br-bot` session。
+2. `tail -f .askplanner/askplanner.log` 没有连续 startup/websocket error。
+3. Feishu 私聊 bot 发 `hi` 能收到回复。
+4. 群里 `@ask-br-bot hi` 能收到回复。
+5. 发 `/ws status` 能看到 workspace repo 状态。
+6. 如刚更新 skills，发一个能命中新 skill 的测试问题。
+
+## 交接注意事项
+
+- 私钥 `/Users/andy/Downloads/br-team.pem` 只用于登录 EC2，不要提交到任何 repo。
+- Feishu app secret 在 EC2 `~/.bashrc`，不要复制到聊天或文档。
+- Codex 目前是个人账号，重启或迁移机器前要确认 `codex login` 状态。
+- 更新 private repo 代码前确认 EC2 上 `gh auth status` 正常。
+- 修改 `prompt`、`agent-rules`、workspace repo ref 后，旧 Codex session 可能失效，这是预期行为。
