@@ -30,7 +30,7 @@ br v6.5.5 版本
 
 客户反馈备份过程报错 
 
-Error: error happen in store 16 at [REDACTED_IP]:20160: Io(Custom { kind: Other, error: "failed to put object rusoto error Request ID: None Body: <?xml version=\\"1.0\\" encoding=\\"UTF-8\\"?>\\n<Error><Code>InvalidAccessKeyId</Code><Message>The AWS Access Key Id you provided does not exist in our records.</Message><AWSAccessKeyId>ASIASYPQWAPQYUXMBQTL</AWSAccessKeyId><RequestId>W5P22T2634TQ42D1</RequestId><HostId>Eunk2hrBjAXQdRSkD7iCGUyL0NXPHAyjywVgu4eizMfM1s2Yxztb16D49Bt3x0xAsU7AjY62S8A=</HostId></Error>" }): \[BR:KV:ErrKVStorage\]tikv storage occur I/O error
+Error: error happen in store 16 at [REDACTED_IP]:20160: Io(Custom { kind: Other, error: "failed to put object rusoto error Request ID: None Body: <?xml version=\\"1.0\\" encoding=\\"UTF-8\\"?>\\n<Error><Code>InvalidAccessKeyId</Code><Message>The AWS Access Key Id you provided does not exist in our records.</Message><AWSAccessKeyId>[REDACTED_AWS_ACCESS_KEY]</AWSAccessKeyId><RequestId>[REDACTED_AWS_REQUEST_ID]</RequestId><HostId>[REDACTED_AWS_EXTENDED_REQUEST_ID]</HostId></Error>" }): \[BR:KV:ErrKVStorage\]tikv storage occur I/O error
 
  
 

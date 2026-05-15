@@ -47,7 +47,7 @@ no GCS credential leak
 ### 3. [REDACTED_USER]
 When using the GCS credential file, the credentials were exposed when adding the log backup task.
 
-> 2025/03/10 13:49:28.778 +00:00] [INFO] [advancer.go:436] ["added event"] [task="storage:<gcs:<bucket:\"[REDACTED_ENV_NAME]\" prefix:\"logbackup\" CredentialsBlob:\"[REDACTED]\"type\\\": \\\"service_account\\\",\\n  \\\"project_id\\\": \\\"qa-[REDACTED_ENV_NAME]\\\",\\n  \\\"private_key_id\\\": \\\"xxxxx\\\",\\n  \\\"private_key\\\": \\\"-----BEGIN PRIVATE KEY-----\\\\
+> 2025/03/10 13:49:28.778 +00:00] [INFO] [advancer.go:436] ["added event"] [task="storage:<gcs:<bucket:\"[REDACTED_ENV_NAME]\" prefix:\"logbackup\" CredentialsBlob:\"[REDACTED_GCS_CREDENTIAL_BLOB]\"
 
 ### 4. [REDACTED_USER]
 

@@ -8,7 +8,7 @@
 - 当前部署分支：fork 仓库 `main`
 - 当前 Ask BR 化基线：`f07c566 Rebrand relay for Ask BR`
 - 部署位置：AWS `us-east-2` 的 EC2，AWS 账号为 `tidb-br-dev-test`
-- SSH private key：本机 `/Users/andy/Downloads/br-team.pem`
+- SSH private key：不要写入仓库；从安全渠道获取后放在本机私有路径
 - 运行方式：`tmux` session `ask-br-bot`
 - 启动命令约定：`tmux new -As ask-br-bot`
 - Feishu 环境变量：EC2 用户的 `~/.bashrc`
@@ -52,13 +52,13 @@ Feishu websocket 模式不需要公网 HTTP callback 地址；进程只要能从
 先确认 key 权限：
 
 ```bash
-chmod 400 /Users/andy/Downloads/br-team.pem
+chmod 400 <ssh-private-key-path>
 ```
 
 从 AWS 控制台进入 `tidb-br-dev-test` 账号，在 `us-east-2` 找到 ask-br-bot 对应 EC2，确认 public DNS/IP 和登录用户。常见登录用户是 `ec2-user` 或 `ubuntu`，以实例 AMI 为准。
 
 ```bash
-ssh -i /Users/andy/Downloads/br-team.pem <ec2-user-or-ubuntu>@<ec2-public-dns>
+ssh -i <ssh-private-key-path> <ec2-user-or-ubuntu>@<ec2-public-dns>
 ```
 
 登录后建议先确认当前进程、tmux、repo 和 env：
@@ -219,7 +219,7 @@ grep -E 'startup error|websocket client failed|handle event error|codex|workspac
 
 ## 交接注意事项
 
-- 私钥 `/Users/andy/Downloads/br-team.pem` 只用于登录 EC2，不要提交到任何 repo。
+- SSH private key 只用于登录 EC2，不要提交到任何 repo，也不要把本机私钥路径写入仓库文档。
 - Feishu app secret 在 EC2 `~/.bashrc`，不要复制到聊天或文档。
 - Codex 目前是个人账号，重启或迁移机器前要确认 `codex login` 状态。
 - 更新 private repo 代码前确认 EC2 上 `gh auth status` 正常。
