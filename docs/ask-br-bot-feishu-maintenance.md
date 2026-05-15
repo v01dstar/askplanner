@@ -5,6 +5,8 @@
 ## 当前状态
 
 - 后端仓库：[v01dstar/askplanner](https://github.com/v01dstar/askplanner)
+- 当前部署分支：fork 仓库 `main`
+- 当前 Ask BR 化基线：`f07c566 Rebrand relay for Ask BR`
 - 部署位置：AWS `us-east-2` 的 EC2，AWS 账号为 `tidb-br-dev-test`
 - SSH private key：本机 `/Users/andy/Downloads/br-team.pem`
 - 运行方式：`tmux` session `ask-br-bot`
@@ -13,6 +15,13 @@
 - Codex 账号：当前使用 Andy 的个人 Codex 账号
 - Feishu bot 管理人：Andy
 - skills 来源：本仓库 `skills/tidb-backup-restore/`
+
+兼容说明：
+
+- Go module、二进制名、默认数据目录仍保留 `askplanner` / `.askplanner`，例如 `./bin/askplanner_larkbot` 和 `.askplanner/askplanner.log`。这是为了兼容现有部署和历史数据。
+- 用户侧产品名和 prompt persona 已切换为 Ask BR。
+- `contrib/agent-rules` 仍可能作为 workspace 兼容 repo 存在，但不是 Ask BR skill 来源。
+- Ask BR 不再自动同步 `agent-rules`，也不再让 `agent-rules` 默认跟踪最新分支；只有明确执行 `/ws sync agent-rules` 时才会刷新它。
 
 ## 架构简述
 
@@ -88,6 +97,15 @@ make larkbot
 ```
 
 启动后留在 tmux 内观察日志几秒，确认没有 startup error。detach tmux 用 `Ctrl-b d`。
+
+更新到 Ask BR 化版本后，建议额外确认：
+
+```bash
+git log -1 --oneline
+grep -n 'You are Ask BR' prompt
+```
+
+然后在 Feishu 里发送 BR/PITR 相关测试问题，确认回答不再默认走 SQL optimizer/query tuning 流程。
 
 如果代码仓库或 submodule 是 private repo，机器上可能需要 GitHub CLI 登录：
 
@@ -174,6 +192,8 @@ grep -E 'startup error|websocket client failed|handle event error|codex|workspac
 - 群聊不响应：检查是否 @ 了 bot，以及 `FEISHU_BOT_NAME` 是否等于 bot 在 Feishu 群里的显示名。
 - Codex 调用超时：检查 `CODEX_TIMEOUT_SEC`、Codex 账号登录状态、机器网络，以及是否有大附件或大 workspace 操作。
 - skills 更新后没生效：重启 larkbot，并新开一次对话测试；如果只改了本仓库 `skills/tidb-backup-restore/`，不需要同步 `agent-rules`。
+- 回答仍像 SQL tuning bot：确认线上代码已拉到 Ask BR 化提交，`prompt` 包含 `You are Ask BR`，并重启 larkbot。旧 Codex session 可能仍带旧 prompt，必要时让用户新开会话或执行重置。
+- workspace env hash 因 `agent-rules` 变化而频繁失效：确认线上代码包含关闭 `agent-rules` 自动同步的版本；Ask BR 不应再因为兼容 repo 自动刷新而失效旧会话。
 
 ## 快速健康检查
 
