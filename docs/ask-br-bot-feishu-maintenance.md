@@ -157,7 +157,7 @@ export FEISHU_BOT_NAME=ask-br-bot
 
 ```bash
 export CODEX_BIN=codex
-export CODEX_MODEL=gpt-5.3-codex
+export CODEX_MODEL=gpt-5.5
 export CODEX_REASONING_EFFORT=medium
 export CODEX_SANDBOX=read-only
 export LOG_FILE=.askplanner/askplanner.log

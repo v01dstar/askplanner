@@ -9,7 +9,7 @@ The historical Go module, binaries, and default state directory still use `askpl
 Here is an example of how to use it:
 ````text
 [Yes VPN-ON] [2026/03/19 6:32:52 Day-078] 192 :: ~/work/askplanner_v2 ‹main*› » ./bin/askplanner_cli
-Ask BR (backend: codex-cli, model: gpt-5.3-codex)
+Ask BR (backend: codex-cli, model: gpt-5.5)
 Type your question, or 'quit' to exit. Use 'reset' to start a new session. Use '/model' to inspect or switch the model for this conversation.
 
 > hi
@@ -270,7 +270,7 @@ Core variables:
 | Env Var | Default | Description |
 |--------|---------|-------------|
 | `CODEX_BIN` | `codex` | Codex CLI binary |
-| `CODEX_MODEL` | `gpt-5.3-codex` | Codex model |
+| `CODEX_MODEL` | `gpt-5.5` | Codex model |
 | `CODEX_REASONING_EFFORT` | `medium` | Default reasoning effort used for Codex execution when the selected model does not expose a cache-derived default |
 | `CODEX_SANDBOX` | `read-only` | Sandbox mode for `codex exec` |
 | `CODEX_PROJECT_ROOT` | `.` | Working root for Codex |

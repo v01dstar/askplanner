@@ -100,7 +100,7 @@ Lint uses `golangci-lint` via `go run github.com/golangci/golangci-lint/v2/cmd/g
 | `FEISHU_APP_ID` | — | **Required** for larkbot |
 | `FEISHU_APP_SECRET` | — | **Required** for larkbot |
 | `CODEX_BIN` | `codex` | Path to codex binary |
-| `CODEX_MODEL` | `gpt-5.3-codex` | |
+| `CODEX_MODEL` | `gpt-5.5` | |
 | `CODEX_REASONING_EFFORT` | `medium` | `low` / `medium` / `high` |
 | `CODEX_SANDBOX` | `read-only` | Always read-only |
 | `CODEX_SESSION_STORE` | `.askplanner/sessions.json` | |

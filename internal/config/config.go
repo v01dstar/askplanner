@@ -89,7 +89,7 @@ func Load() (*Config, error) {
 		ProjectRoot:                       projectRoot,
 		PromptFile:                        resolvePath(projectRoot, envOrDefault("PROMPT_FILE", "prompt")),
 		CodexBin:                          envOrDefault("CODEX_BIN", "codex"),
-		CodexModel:                        envOrDefault("CODEX_MODEL", "gpt-5.3-codex"),
+		CodexModel:                        envOrDefault("CODEX_MODEL", "gpt-5.5"),
 		CodexReasoningEffort:              envOrDefault("CODEX_REASONING_EFFORT", "medium"),
 		CodexSandbox:                      envOrDefault("CODEX_SANDBOX", "read-only"),
 		CodexSessionStore:                 resolvePath(projectRoot, envOrDefault("CODEX_SESSION_STORE", ".askplanner/sessions.json")),
